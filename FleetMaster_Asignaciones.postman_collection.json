@@ -1,0 +1,145 @@
+{
+	"info": {
+		"_postman_id": "4b6a9a0e-5d6c-4b6e-8f9a-1b2c3d4e5f6g",
+		"name": "FleetMaster - Asignaciones",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Crear Asignación",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"vehicleId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"driverId\": \"660e8400-e29b-41d4-a716-446655440001\",\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440002\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/asignaciones",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"asignaciones"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cerrar Asignación",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"finalKm\": 1250.0,\n    \"userId\": \"770e8400-e29b-41d4-a716-446655440002\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/asignaciones/{{assignmentId}}/cerrar",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"asignaciones",
+						"{{assignmentId}}",
+						"cerrar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Historial de Vehículo",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/vehiculos/550e8400-e29b-41d4-a716-446655440000/historial",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"vehiculos",
+						"550e8400-e29b-41d4-a716-446655440000",
+						"historial"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Exportar XLSX",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/asignaciones/export?formato=XLSX",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"asignaciones",
+						"export"
+					],
+					"query": [
+						{
+							"key": "formato",
+							"value": "XLSX"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Exportar CSV",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/asignaciones/export?formato=CSV",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"asignaciones",
+						"export"
+					],
+					"query": [
+						{
+							"key": "formato",
+							"value": "CSV"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
