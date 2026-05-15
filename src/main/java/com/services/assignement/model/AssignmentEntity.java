@@ -19,13 +19,17 @@ public class AssignmentEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vehicle_id", nullable = false)
-    private VehicleEntity vehicle;
+    @Column(name = "vehicle_id", nullable = false)
+    private UUID vehicleId;
+    
+    @Column(name = "vehicle_plate", nullable = false)
+    private String vehiclePlate;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "driver_id", nullable = false)
-    private DriverEntity driver;
+    @Column(name = "driver_id", nullable = false)
+    private UUID driverId;
+    
+    @Column(name = "driver_name", nullable = false)
+    private String driverName;
 
     @Column(nullable = false)
     private UUID createdByUserId;
