@@ -3,16 +3,14 @@ spring:
     name: assignement-services
 
   datasource:
-    url: jdbc:mysql://${TIDB_HOST}:${TIDB_PORT:4000}/${TIDB_DB}
-    username: ${TIDB_USER}
-    password: ${TIDB_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:postgresql://${TIDB_HOST:localhost}:${TIDB_PORT:6543}/${TIDB_DB:fleetmaster_db}?currentSchema=assignements_db&sslmode=disable
+    username: ${TIDB_USER:admin}
+    password: ${TIDB_PASSWORD:admin_pass}
+    driver-class-name: org.postgresql.Driver
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
 
 server:
   port: ${PORT:8080}
