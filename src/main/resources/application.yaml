@@ -2,16 +2,17 @@ spring:
   application:
     name: assignement-services
 
-  # Configuración PostgreSQL (Supabase/TiDB)
   datasource:
-    url: jdbc:postgresql://${TIDB_HOST}:${TIDB_PORT:6543}/${TIDB_DB}?currentSchema=assignements_db&sslmode=require
+    url: jdbc:mysql://${TIDB_HOST}:${TIDB_PORT:4000}/${TIDB_DB}
     username: ${TIDB_USER}
     password: ${TIDB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
 
 server:
   port: ${PORT:8080}
@@ -40,3 +41,7 @@ feign:
       default:
         connectTimeout: 5000
         readTimeout: 5000
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}

@@ -38,8 +38,8 @@ public class ExportService {
                 
                 String[] data = {
                     a.getId().toString(),
-                    a.getVehicle().getPlate(),
-                    a.getDriver().getName(),
+                    a.getVehiclePlate(),
+                    a.getDriverName(),
                     a.getStartDate().format(DATE_FORMATTER),
                     a.getEndDate() != null ? a.getEndDate().format(DATE_FORMATTER) : "Activa",
                     a.getInitialKm().toString(),
@@ -78,8 +78,8 @@ public class ExportService {
             for (AssignmentEntity a : assignments) {
                 Row row = sheet.createRow(rowIdx++);
                 row.createCell(0).setCellValue(a.getId().toString());
-                row.createCell(1).setCellValue(a.getVehicle().getPlate());
-                row.createCell(2).setCellValue(a.getDriver().getName());
+                row.createCell(1).setCellValue(a.getVehiclePlate());
+                row.createCell(2).setCellValue(a.getDriverName());
                 row.createCell(3).setCellValue(a.getStartDate().format(DATE_FORMATTER));
                 row.createCell(4).setCellValue(a.getEndDate() != null ? a.getEndDate().format(DATE_FORMATTER) : "Activa");
                 row.createCell(5).setCellValue(a.getInitialKm());

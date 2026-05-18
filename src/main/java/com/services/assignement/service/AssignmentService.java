@@ -1,20 +1,17 @@
 package com.services.assignement.service;
 
+import com.services.assignement.client.DriverClient;
+import com.services.assignement.client.VehicleClient;
 import com.services.assignement.dto.AssignmentRequest;
 import com.services.assignement.dto.AssignmentResponse;
 import com.services.assignement.dto.CloseAssignmentRequest;
 import com.services.assignement.dto.HistoryItemDTO;
-import com.services.assignement.enums.DriverStatus;
-import com.services.assignement.enums.VehicleStatus;
 import com.services.assignement.exception.BusinessException;
 import com.services.assignement.exception.ResourceNotFoundException;
 import com.services.assignement.mapper.AssignmentMapper;
 import com.services.assignement.model.AssignmentEntity;
-import com.services.assignement.model.DriverEntity;
-import com.services.assignement.model.VehicleEntity;
 import com.services.assignement.repository.AssignmentRepository;
-import com.services.assignement.repository.DriverRepository;
-import com.services.assignement.repository.VehicleRepository;
+import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,39 +28,46 @@ import java.util.stream.Collectors;
 public class AssignmentService {
 
     private final AssignmentRepository assignmentRepository;
-    private final VehicleRepository vehicleRepository;
-    private final DriverRepository driverRepository;
+    private final VehicleClient vehicleClient;
+    private final DriverClient driverClient;
     private final AssignmentMapper assignmentMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public AssignmentResponse createAssignment(AssignmentRequest request) {
         log.info("Iniciando asignación para vehículo {} y conductor {}", request.getVehicleId(), request.getDriverId());
 
-        // 1. Bloqueo pesimista y validación de existencia (Orden: Vehículo -> Conductor para evitar deadlocks)
-        VehicleEntity vehicle = vehicleRepository.findByIdWithLock(request.getVehicleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
+        VehicleClient.VehicleResponse vehicle;
+        try {
+            vehicle = vehicleClient.getVehicleById(request.getVehicleId());
+        } catch (FeignException.NotFound e) {
+            throw new ResourceNotFoundException("Vehículo no encontrado");
+        }
 
-        DriverEntity driver = driverRepository.findByIdWithLock(request.getDriverId())
-                .orElseThrow(() -> new ResourceNotFoundException("Conductor no encontrado"));
+        DriverClient.DriverResponse driver;
+        try {
+            driver = driverClient.getDriverById(request.getDriverId());
+        } catch (FeignException.NotFound e) {
+            throw new ResourceNotFoundException("Conductor no encontrado");
+        }
 
-        // 2. Validaciones de negocio (REQ-22, REQ-23, REQ-24)
         validateVehicle(vehicle);
         validateDriver(driver);
 
-        // 3. Actualizar estados
-        vehicle.setStatus(VehicleStatus.ASIGNADO);
-        driver.setStatus(DriverStatus.EN_RUTA);
+        // Actualizar estados remotos
+        vehicleClient.assignVehicle(request.getVehicleId());
+        driverClient.assignDriver(request.getDriverId());
 
-        vehicleRepository.save(vehicle);
-        driverRepository.save(driver);
+        String driverName = driver.firstName() + " " + driver.lastName();
 
-        // 4. Crear asignación
+        // Crear asignación local
         AssignmentEntity assignment = AssignmentEntity.builder()
-                .vehicle(vehicle)
-                .driver(driver)
+                .vehicleId(vehicle.id())
+                .vehiclePlate(vehicle.plate())
+                .driverId(driver.idDriver())
+                .driverName(driverName)
                 .createdByUserId(request.getUserId())
                 .startDate(LocalDateTime.now())
-                .initialKm(vehicle.getCurrentKm())
+                .initialKm(vehicle.currentKm())
                 .build();
 
         AssignmentEntity saved = assignmentRepository.save(assignment);
@@ -87,21 +91,11 @@ public class AssignmentService {
             throw new BusinessException("Error de lógica en odómetro: El kilometraje final no puede ser menor al inicial");
         }
 
-        // Bloquear entidades relacionadas
-        VehicleEntity vehicle = vehicleRepository.findByIdWithLock(assignment.getVehicle().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vehículo no encontrado"));
-        DriverEntity driver = driverRepository.findByIdWithLock(assignment.getDriver().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Conductor no encontrado"));
+        // Actualizar estados remotos (el release del vehículo actualiza el KM)
+        vehicleClient.releaseVehicle(assignment.getVehicleId(), new VehicleClient.ReleaseVehicleRequest(request.getFinalKm()));
+        driverClient.releaseDriver(assignment.getDriverId());
 
-        // Actualizar estados
-        vehicle.setStatus(VehicleStatus.DISPONIBLE);
-        vehicle.setCurrentKm(request.getFinalKm());
-        driver.setStatus(DriverStatus.ACTIVO);
-
-        vehicleRepository.save(vehicle);
-        driverRepository.save(driver);
-
-        // Cerrar asignación
+        // Cerrar asignación local
         assignment.setEndDate(LocalDateTime.now());
         assignment.setFinalKm(request.getFinalKm());
 
@@ -121,31 +115,50 @@ public class AssignmentService {
                 .type("ASIGNACION")
                 .id(a.getId())
                 .date(a.getStartDate())
-                .description(String.format("Asignación a %s", a.getDriver().getName()))
-                .conductor(a.getDriver().getName())
+                .description(String.format("Asignación a %s", a.getDriverName()))
+                .conductor(a.getDriverName())
                 .km(a.getInitialKm())
                 .build())
                 .collect(Collectors.toList());
     }
 
-    private void validateVehicle(VehicleEntity vehicle) {
-        if (vehicle.getStatus() != VehicleStatus.DISPONIBLE) {
-            throw new BusinessException("El vehículo no está disponible (Estado actual: " + vehicle.getStatus() + ")");
+    private void validateVehicle(VehicleClient.VehicleResponse vehicle) {
+        if (!"ACTIVO".equals(vehicle.operationalStatus())) {
+            throw new BusinessException("El vehículo no está disponible (Estado actual: " + vehicle.operationalStatus() + ")");
         }
-        if (vehicle.getSoatExpiryDate().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("El SOAT del vehículo está vencido");
+
+        List<VehicleClient.DocumentResponse> docs = vehicleClient.getVehicleDocuments(vehicle.id());
+        boolean hasValidSoat = false;
+        boolean hasValidTecno = false;
+
+        for (VehicleClient.DocumentResponse doc : docs) {
+            if ("VIGENTE".equals(doc.legalStatus())) {
+                if ("SOAT".equals(doc.documentType())) hasValidSoat = true;
+                if ("TECNOMECANICA".equals(doc.documentType())) hasValidTecno = true;
+            }
         }
-        if (vehicle.getTechnoExpiryDate().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("La revisión Tecnomecánica está vencida");
+
+        if (!hasValidSoat) {
+            throw new BusinessException("El SOAT del vehículo está vencido o no existe");
+        }
+        if (!hasValidTecno) {
+            throw new BusinessException("La revisión Tecnomecánica está vencida o no existe");
         }
     }
 
-    private void validateDriver(DriverEntity driver) {
-        if (driver.getStatus() != DriverStatus.ACTIVO) {
-            throw new BusinessException("El conductor no está activo (Estado actual: " + driver.getStatus() + ")");
+    private void validateDriver(DriverClient.DriverResponse driver) {
+        if (!"ACTIVO".equals(driver.employmentStatus())) {
+            throw new BusinessException("El conductor no está activo laboralmente (Estado actual: " + driver.employmentStatus() + ")");
         }
-        if (driver.getLicenseExpiryDate().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("La licencia del conductor está vencida");
+        if (!"DISPONIBLE".equals(driver.operationalStatus())) {
+            throw new BusinessException("El conductor no está disponible operativamente (Estado actual: " + driver.operationalStatus() + ")");
+        }
+        
+        boolean hasValidLicense = driver.licenses().stream()
+                .anyMatch(l -> "VIGENTE".equals(l.licenseStatus()));
+
+        if (!hasValidLicense) {
+            throw new BusinessException("La licencia del conductor está vencida o no existe");
         }
     }
 }
