@@ -30,7 +30,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, prometheus
   endpoint:
     health:
       show-details: always
@@ -44,4 +44,4 @@ feign:
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET}
