@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -23,12 +24,14 @@ public class AssignmentController {
     private final ExportService exportService;
 
     @PostMapping("/asignaciones")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR', 'ROLE_COORDINADOR', 'ROLE_DESPACHADOR')")
     public ResponseEntity<ApiResponse<AssignmentResponse>> createAssignment(@Valid @RequestBody AssignmentRequest request) {
         AssignmentResponse response = assignmentService.createAssignment(request);
         return ResponseEntity.ok(ApiResponse.success(response, "Asignación creada exitosamente"));
     }
 
     @PatchMapping("/asignaciones/{id}/cerrar")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR', 'ROLE_COORDINADOR', 'ROLE_DESPACHADOR')")
     public ResponseEntity<ApiResponse<AssignmentResponse>> closeAssignment(
             @PathVariable UUID id,
             @Valid @RequestBody CloseAssignmentRequest request) {
@@ -37,12 +40,14 @@ public class AssignmentController {
     }
 
     @GetMapping("/vehiculos/{id}/historial")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR', 'ROLE_COORDINADOR', 'ROLE_DESPACHADOR')")
     public ResponseEntity<ApiResponse<List<HistoryItemDTO>>> getVehicleHistory(@PathVariable UUID id) {
         List<HistoryItemDTO> history = assignmentService.getVehicleHistory(id);
         return ResponseEntity.ok(ApiResponse.success(history, "Historial obtenido exitosamente"));
     }
 
     @GetMapping("/asignaciones/export")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMINISTRADOR', 'ROLE_COORDINADOR', 'ROLE_DESPACHADOR')")
     public ResponseEntity<byte[]> exportAssignments(@RequestParam(defaultValue = "CSV") String formato) throws IOException {
         byte[] data;
         String filename;
